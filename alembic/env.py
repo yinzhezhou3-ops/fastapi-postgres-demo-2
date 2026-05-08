@@ -17,7 +17,7 @@ from app.core.config import DATABASE_URL
 config = context.config
 fileConfig(config.config_file_name)
 
-from app.models import Base
+from app.db.models import Base
 target_metadata = Base.metadata
 
 def run_migrations_offline():
