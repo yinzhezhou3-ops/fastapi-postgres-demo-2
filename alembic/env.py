@@ -1,28 +1,20 @@
-import sys
-from pathlib import Path
 from logging.config import fileConfig
-from dotenv import load_dotenv
-
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config
+from sqlalchemy import pool
 from alembic import context
 
-# 自动加载 .env 文件
-load_dotenv()
-
-# 把项目根目录加入路径
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from app.core.config import DATABASE_URL
+# 👇 先不导入模型，让 Alembic 能正常运行
+target_metadata = None
 
 config = context.config
-fileConfig(config.config_file_name)
 
-from app.db.models import Base
-target_metadata = Base.metadata
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
 
-def run_migrations_offline():
+def run_migrations_offline() -> None:
+    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=DATABASE_URL,
+        url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -30,20 +22,16 @@ def run_migrations_offline():
     with context.begin_transaction():
         context.run_migrations()
 
-def run_migrations_online():
+def run_migrations_online() -> None:
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
+        config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        url=DATABASE_URL,
     )
-
     with connectable.connect() as connection:
         context.configure(
-            connection=connection,
-            target_metadata=target_metadata
+            connection=connection, target_metadata=target_metadata
         )
-
         with context.begin_transaction():
             context.run_migrations()
 
