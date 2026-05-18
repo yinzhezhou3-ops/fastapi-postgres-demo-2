@@ -1,14 +1,16 @@
 from pydantic import BaseModel
+from typing import Optional
 
 class ItemBase(BaseModel):
     name: str
-    description: str | None = None
+    price: float
+    description: Optional[str] = None
 
 class ItemCreate(ItemBase):
     pass
 
-class Item(ItemBase):
+class ItemResponse(ItemBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # SQLAlchemy 模型转换支持

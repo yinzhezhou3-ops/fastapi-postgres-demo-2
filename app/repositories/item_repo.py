@@ -1,16 +1,29 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.db.models.item import Item
-from app.schemas.item import ItemCreate
 
 class ItemRepository:
-    @staticmethod
-    def get_items(db: Session, skip: int = 0, limit: int = 10):
-        return db.query(Item).offset(skip).limit(limit).all()
+    def __init__(self, db: AsyncSession):
+        self.db = db
 
-    @staticmethod
-    def create_item(db: Session, item: ItemCreate):
-        db_item = Item(**item.dict())
-        db.add(db_item)
-        db.commit()
-        db.refresh(db_item)
+    async def create(self, item_data) -> Item:
+        """创建物品"""
+        db_item = Item(**item_data.model_dump())
+        self.db.add(db_item)
+        await self.db.commit()
+        await self.db.refresh(db_item)
         return db_item
+
+    async def get(self, item_id: int) -> Item | None:
+        """根据 ID 获取物品"""
+        result = await self.db.execute(
+            select(Item).where(Item.id == item_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_all(self, skip: int = 0, limit: int = 100) -> list[Item]:
+        """获取所有物品"""
+        result = await self.db.execute(
+            select(Item).offset(skip).limit(limit)
+        )
+        return result.scalars().all()

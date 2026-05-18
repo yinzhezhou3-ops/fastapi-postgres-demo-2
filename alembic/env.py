@@ -1,17 +1,31 @@
+import asyncio
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy.engine import Connection
+from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
-# 👇 先不导入模型，让 Alembic 能正常运行
-target_metadata = None
+# 导入你的 Base 和模型
+from app.db.base import Base
+from app.db.models.item import Item  # 导入模型让 Alembic 发现
+from app.core.config import DATABASE_URL
 
+# 这是 Alembic 的配置对象
 config = context.config
 
+# 设置数据库 URL
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
+
+# 日志配置
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# 目标元数据
+target_metadata = Base.metadata
+
+
 def run_migrations_offline() -> None:
+    """离线模式运行迁移"""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -19,21 +33,40 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
+
     with context.begin_transaction():
         context.run_migrations()
 
-def run_migrations_online() -> None:
-    connectable = engine_from_config(
+
+def do_run_migrations(connection: Connection) -> None:
+    """执行迁移"""
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+async def run_async_migrations() -> None:
+    """异步模式运行迁移"""
+    connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
-        with context.begin_transaction():
-            context.run_migrations()
+
+    async with connectable.connect() as connection:
+        await connection.run_sync(do_run_migrations)
+
+    await connectable.dispose()
+
+
+def run_migrations_online() -> None:
+    """在线模式运行迁移"""
+    asyncio.run(run_async_migrations())
+
 
 if context.is_offline_mode():
     run_migrations_offline()
